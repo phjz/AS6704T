@@ -91,8 +91,10 @@ var d1,d2,i,d,h,m,fan,dt,ct,et,pwm,stop;
 function fancontrol() {
   ct=fs.readFileSync("/sys/class/hwmon/hwmon4/temp1_input");
   pwm=parseInt(fs.readFileSync("/sys/class/hwmon/hwmon3/pwm1"));
-  i=(ct-60000)/(105000-60000)*(255-13)-58;//+31;
-  if (i<13) i=13;
+  i=(ct-60000)/(105000-60000)*(255-13)-31; //58;//+31;
+  if (i>60) i=60-(i-60)/3;	// slowing rise
+  else if (i>40) i=40-(i-40)/2;	//below quiet
+  if (i<13) i=13; 		// min. pwm
   else if (i>255) i=255;
   else i=parseInt(i);
   i=parseInt((pwm*3+i)/4);
