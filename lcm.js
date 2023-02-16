@@ -11,7 +11,7 @@ const net=require("net");
 var coms=null;
 
 function prettydate(d) {
-  var ts_hms = new Date(d.getTime();
+  var ts_hms = new Date(d.getTime());
   var ms = (ts_hms.getTime() % 1000);
   return ("00" + (ts_hms.getFullYear())).slice(-4) + '.' + ("0" + (ts_hms.getMonth() + 1)).slice(-2) + '.' + ("0" + (ts_hms.getDate())).slice(-2) + ' ' +
     ("0" + ts_hms.getHours()).slice(-2) + ':' + ("0" + ts_hms.getMinutes()).slice(-2) + ':' + ("0" + ts_hms.getSeconds()).slice(-2) + "." + (ms < 100 ? '0' + ms : ms);
@@ -91,7 +91,7 @@ var d1,d2,i,d,h,m,fan,dt,ct,et,pwm,stop;
 function fancontrol() {
   ct=fs.readFileSync("/sys/class/hwmon/hwmon4/temp1_input");
   pwm=parseInt(fs.readFileSync("/sys/class/hwmon/hwmon3/pwm1"));
-  i=(ct-60000)/(110000-60000)*(255-21)-58;//+31;
+  i=(ct-60000)/(105000-60000)*(255-13)-58;//+31;
   if (i<13) i=13;
   else if (i>255) i=255;
   else i=parseInt(i);
