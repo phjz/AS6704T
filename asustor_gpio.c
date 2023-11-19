@@ -284,18 +284,20 @@ static int __init it87_gpio_init(void)
 	u16 chip_type;
 	u8 chip_rev, gpio_ba_reg;
 	char *labels, **labels_table;
-
 	struct it87_gpio *it87_gpio = &it87_gpio_chip;
 
+
+
 	rc = superio_enter();
-	if (rc)
-		return rc;
+	if (rc) return rc;
 
 	chip_type = superio_inw(CHIPID);
 	chip_rev  = superio_inb(CHIPREV) & 0x0f;
+
 	superio_exit();
 
 	it87_gpio->chip = it87_template_chip;
+
 
 	switch (chip_type) {
 	case IT8613_ID:
