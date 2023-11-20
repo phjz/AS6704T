@@ -14,8 +14,10 @@ if (fs.existsSync("/sys/class/hwmon/hwmon4/pwm1")) i=4; else i=3;
 const IT87_HW="/sys/class/hwmon/hwmon"+i+"/";
 const NORMAL_HW="/sys/class/hwmon/hwmon"+(i==4?3:4)+"/";
 var coms=null;
-const PWM_MIN=21;
-const PWM_MAX=90;
+const PWM_MIN=21; //below that the fan stopped..
+const PWM_MAX=90; //at higher value the fan became too noisy, moreover the NVME became too cold
+//const fd_green=fs.open("/sys/class/leds/red:status/brightness");
+//const fd_blink=fs.open(IT87_HW+"gpled1_blink_freq");
 var pwm_fd,temp_fd,fan_fd;
 fs.open(IT87_HW+"pwm1",'w', function(err,fd) { if(err) consolelog(err.toString()); else pwm_fd=fd; });
 fs.open(NORMAL_HW+"temp1_input", function(err,fd) { if(err) consolelog(err.toString()); else temp_fd=fd; });
@@ -56,7 +58,8 @@ function communicate() {
   setTimeout(setLine,1001,1,0,"... running ... ");
  });
  coms.on('data', function(buff) {
- if (buff[0]==0xf0 && buff[1]==0x01 && buff[2]==0x80) {
+  //  consolelog("data["+buff.length+"] "+buff.slice(0, buff.length).toString('hex')+"\n"+buff.toString());
+  if (buff[0]==0xf0 && buff[1]==0x01 && buff[2]==0x80) {
    switch(buff[3]) {
    case 0x01: // button 1: UP
     cyc--; lcdcontrol();
@@ -82,11 +85,13 @@ function communicate() {
 
 function checksum(b,sum) {
  for (var i=0;i<b.length-1;i++) sum+=b[i];
+ // consolelog("checksum["+b.length+"]:"+sum.toString(16)); 
  return(sum&0xff);
 }
 function setLine(line, indent, msg) {
  var s=Buffer.from(msg);
  if (s.lenght>16) { consolelog("message size too long:"+s.length); return; }
+ // consolelog("send:"+s.slice(0, s.length).toString('hex')); 
  var b=Buffer.alloc(0x12+4);
  b.fill(0x20);
  s.copy(b,5);
@@ -96,6 +101,7 @@ function setLine(line, indent, msg) {
  b[3]=line;
  b[4]=indent;
  b[b.length-1]=checksum(b,0);
+ // consolelog("sent:"+b.slice(0, b.length).toString('hex')); 
  if (coms) coms.write(b);
 }
 // f0 12 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff
@@ -146,8 +152,10 @@ var avg=0;
 busy=[0,0,0];
 
 function fancontrol() {
+  //ct=fs.readFileSync(NORMAL_HW+"temp1_input");
   if (isNaN(pwm)) return;
   get_temp();
+  //pwm=parseInt(fs.readFileSync(IT87_HW+"pwm1"));
   if ( !tempalarm && (ct >= 88000)) {
    tempalarm = 1;
    fs.writeFileSync("/sys/class/leds/red:power/brightness","1"); 
@@ -155,22 +163,21 @@ function fancontrol() {
    tempalarm = 0;
    fs.writeFileSync("/sys/class/leds/red:power/brightness","0"); 
   }
-  i=(ct-60000)/(105000-60000)*255; //-68;
+  i=(ct-65000)/1000;                  //diff in Celsius to min
+  i=i/35*PWM_MAX;                     //full range 65-100=35C, at 100C max PWM, linear 
   d=i;
-  if (i>255) i=255;
-   if (i>87) { i=87+((i-87)/2); }
-   else
-    i=16 + (i/5);
-   i-=4;
-  if (i > pwm) i=parseInt((pwm+2*i)/3);
-  else i=parseInt((pwm*2+i)/3);
-  if (i < PWM_MIN) i=PWM_MIN; 		// min. pwm
+  if (i > pwm) i=parseInt((pwm+i)/2); // quickly ramp up
+  else i=parseInt((pwm*2+i)/3);       // slow down
+  if (i < PWM_MIN) i=PWM_MIN;         // min/max pwm check
   else if (i > PWM_MAX) i=PWM_MAX;
+  //fan=parseInt(fs.readFileSync(IT87_HW+"fan1_input"));
+  stx=" ";
   if (busy[0].toFixed(1)!=avg.toFixed(1)) {
    stx="avg:"+busy[0].toFixed(2)+" ";
    avg = busy[0];
   } else stx=" ";
   if (pwm != i) {
+   //fs.writeFileSync(IT87_HW+"pwm1",""+i);
    set_pwm(i);
    pwm = i;
    consolelog(stx+"fan="+fan+" t="+(ct/1000).toFixed(2)+" -> pwm:"+d.toFixed(1)+" / "+i);
